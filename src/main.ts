@@ -553,6 +553,28 @@ function draw(): void {
         : `\u25C6 ${gems}`
   ctx.fillText(gemText, offsetX + CELL + 310 * hud, offsetY + CELL / 2)
 
+  // On-screen d-pad (touch devices, portrait orientation)
+  if (dpadVisible()) {
+    for (const b of dpadButtons()) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'
+      ctx.lineWidth = 2
+      ctx.fillRect(b.x, b.y, b.w, b.h)
+      ctx.strokeRect(b.x, b.y, b.w, b.h)
+      // Arrow pointing in the button's direction
+      const cx = b.x + b.w / 2
+      const cy = b.y + b.h / 2
+      const a = b.w * 0.22
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
+      ctx.beginPath()
+      ctx.moveTo(cx + b.dx * a, cy + b.dy * a)
+      ctx.lineTo(cx - b.dx * a + b.dy * a, cy - b.dy * a + b.dx * a)
+      ctx.lineTo(cx - b.dx * a - b.dy * a, cy - b.dy * a - b.dx * a)
+      ctx.closePath()
+      ctx.fill()
+    }
+  }
+
   const centerOverlay = (dim: boolean) => {
     if (dim) {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
@@ -693,6 +715,35 @@ window.addEventListener('keyup', (e) => {
 const SWIPE_MIN = 30
 let touchStart: { x: number; y: number } | null = null
 
+const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+
+// On-screen d-pad shown on touch devices in portrait orientation
+interface DpadButton {
+  dx: number
+  dy: number
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+function dpadVisible(): boolean {
+  return isTouch && canvas.height > canvas.width && state === 'playing'
+}
+
+function dpadButtons(): DpadButton[] {
+  const bs = 56
+  const gap = 8
+  const cx = canvas.width / 2
+  const bottom = canvas.height - 20
+  return [
+    { dx: 0, dy: -1, x: cx - bs / 2, y: bottom - 3 * bs - 2 * gap, w: bs, h: bs },
+    { dx: -1, dy: 0, x: cx - bs / 2 - gap - bs, y: bottom - 2 * bs - gap, w: bs, h: bs },
+    { dx: 1, dy: 0, x: cx + bs / 2 + gap, y: bottom - 2 * bs - gap, w: bs, h: bs },
+    { dx: 0, dy: 1, x: cx - bs / 2, y: bottom - bs, w: bs, h: bs },
+  ]
+}
+
 canvas.addEventListener(
   'touchstart',
   (e) => {
@@ -714,7 +765,30 @@ canvas.addEventListener(
     e.preventDefault()
     if (Math.abs(dx) < SWIPE_MIN && Math.abs(dy) < SWIPE_MIN) {
       // Tap: advance non-playing screens
-      if (state !== 'playing') advance()
+      if (state !== 'playing') {
+        advance()
+        return
+      }
+      // Tap on a d-pad button moves in that direction
+      if (dpadVisible()) {
+        for (const b of dpadButtons()) {
+          if (t.clientX >= b.x && t.clientX <= b.x + b.w && t.clientY >= b.y && t.clientY <= b.y + b.h) {
+            tryMove(b.dx, b.dy)
+            return
+          }
+        }
+      }
+      // Otherwise move towards the tap: dominant axis relative to the player
+      const px = offsetX + player.x * CELL + CELL / 2
+      const py = offsetY + player.y * CELL + CELL / 2
+      const tx = t.clientX - px
+      const ty = t.clientY - py
+      if (Math.abs(tx) < CELL / 2 && Math.abs(ty) < CELL / 2) return // tapped the player itself
+      if (Math.abs(tx) > Math.abs(ty)) {
+        tryMove(tx > 0 ? 1 : -1, 0)
+      } else {
+        tryMove(0, ty > 0 ? 1 : -1)
+      }
       return
     }
     if (Math.abs(dx) > Math.abs(dy)) {
