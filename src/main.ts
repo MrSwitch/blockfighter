@@ -1,6 +1,9 @@
 import './style.css'
 
-const CELL = 50
+// Cell size in px: at most 50, shrunk so the grid is always at least 10x10 cells
+const MAX_CELL = 50
+const MIN_GRID = 10
+let CELL = MAX_CELL
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!
 const ctx = canvas.getContext('2d')!
@@ -143,6 +146,10 @@ function placeLightBlue(): void {
 function resize(): void {
   canvas.width = window.innerWidth
   canvas.height = window.innerHeight
+  CELL = Math.max(
+    1,
+    Math.min(MAX_CELL, Math.floor(canvas.width / MIN_GRID), Math.floor(canvas.height / MIN_GRID)),
+  )
   cols = Math.floor(canvas.width / CELL)
   rows = Math.floor(canvas.height / CELL)
   offsetX = Math.floor((canvas.width - cols * CELL) / 2)
@@ -415,19 +422,21 @@ function draw(): void {
     ctx.fillRect(offsetX + lightBlue.x * CELL + 2, offsetY + lightBlue.y * CELL + 2, CELL - 4, CELL - 4)
     // Sparkle
     ctx.fillStyle = '#ffffff'
-    const sx = offsetX + lightBlue.x * CELL + CELL / 2
-    const sy = offsetY + lightBlue.y * CELL + CELL / 2
+    ctx.save()
+    ctx.translate(offsetX + lightBlue.x * CELL + CELL / 2, offsetY + lightBlue.y * CELL + CELL / 2)
+    ctx.scale(CELL / MAX_CELL, CELL / MAX_CELL)
     ctx.beginPath()
-    ctx.moveTo(sx, sy - 8)
-    ctx.lineTo(sx + 3, sy - 3)
-    ctx.lineTo(sx + 8, sy)
-    ctx.lineTo(sx + 3, sy + 3)
-    ctx.lineTo(sx, sy + 8)
-    ctx.lineTo(sx - 3, sy + 3)
-    ctx.lineTo(sx - 8, sy)
-    ctx.lineTo(sx - 3, sy - 3)
+    ctx.moveTo(0, -8)
+    ctx.lineTo(3, -3)
+    ctx.lineTo(8, 0)
+    ctx.lineTo(3, 3)
+    ctx.lineTo(0, 8)
+    ctx.lineTo(-3, 3)
+    ctx.lineTo(-8, 0)
+    ctx.lineTo(-3, -3)
     ctx.closePath()
     ctx.fill()
+    ctx.restore()
   }
 
   // Purple chasers
@@ -437,28 +446,30 @@ function draw(): void {
   }
   // ...each with an angry face
   for (const e of enemies) {
-    const cx = offsetX + e.x * CELL + CELL / 2
-    const cy = offsetY + e.y * CELL + CELL / 2
+    ctx.save()
+    ctx.translate(offsetX + e.x * CELL + CELL / 2, offsetY + e.y * CELL + CELL / 2)
+    ctx.scale(CELL / MAX_CELL, CELL / MAX_CELL)
     // Angry eyebrows
     ctx.strokeStyle = '#111'
     ctx.lineWidth = 3
     ctx.lineCap = 'round'
     ctx.beginPath()
-    ctx.moveTo(cx - 13, cy - 13)
-    ctx.lineTo(cx - 4, cy - 8)
-    ctx.moveTo(cx + 13, cy - 13)
-    ctx.lineTo(cx + 4, cy - 8)
+    ctx.moveTo(-13, -13)
+    ctx.lineTo(-4, -8)
+    ctx.moveTo(13, -13)
+    ctx.lineTo(4, -8)
     ctx.stroke()
     // Eyes
     ctx.fillStyle = '#111'
     ctx.beginPath()
-    ctx.arc(cx - 8, cy - 4, 3, 0, Math.PI * 2)
-    ctx.arc(cx + 8, cy - 4, 3, 0, Math.PI * 2)
+    ctx.arc(-8, -4, 3, 0, Math.PI * 2)
+    ctx.arc(8, -4, 3, 0, Math.PI * 2)
     ctx.fill()
     // Frown
     ctx.beginPath()
-    ctx.arc(cx, cy + 14, 9, 1.2 * Math.PI, 1.8 * Math.PI)
+    ctx.arc(0, 14, 9, 1.2 * Math.PI, 1.8 * Math.PI)
     ctx.stroke()
+    ctx.restore()
   }
 
   // Player (red block)
@@ -487,19 +498,21 @@ function draw(): void {
 
   // Smiley face on the player
   {
-    const cx = offsetX + player.x * CELL + CELL / 2
-    const cy = offsetY + player.y * CELL + CELL / 2
+    ctx.save()
+    ctx.translate(offsetX + player.x * CELL + CELL / 2, offsetY + player.y * CELL + CELL / 2)
+    ctx.scale(CELL / MAX_CELL, CELL / MAX_CELL)
     ctx.fillStyle = '#111'
     ctx.beginPath()
-    ctx.arc(cx - 8, cy - 7, 3.5, 0, Math.PI * 2) // left eye
-    ctx.arc(cx + 8, cy - 7, 3.5, 0, Math.PI * 2) // right eye
+    ctx.arc(-8, -7, 3.5, 0, Math.PI * 2) // left eye
+    ctx.arc(8, -7, 3.5, 0, Math.PI * 2) // right eye
     ctx.fill()
     ctx.strokeStyle = '#111'
     ctx.lineWidth = 3
     ctx.lineCap = 'round'
     ctx.beginPath()
-    ctx.arc(cx, cy + 3, 10, 0.15 * Math.PI, 0.85 * Math.PI) // smile
+    ctx.arc(0, 3, 10, 0.15 * Math.PI, 0.85 * Math.PI) // smile
     ctx.stroke()
+    ctx.restore()
   }
 
   // Explosions
@@ -520,14 +533,15 @@ function draw(): void {
     ctx.globalAlpha = 1
   }
 
-  // Lives + level HUD
+  // Lives + level HUD (scaled with the cell size)
+  const hud = CELL / MAX_CELL
   ctx.fillStyle = '#fff'
-  ctx.font = 'bold 24px system-ui, sans-serif'
+  ctx.font = `bold ${Math.round(24 * hud)}px system-ui, sans-serif`
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
   ctx.fillText(
     `Level ${level}   Lives: ${'\u2764'.repeat(Math.max(lives, 0))}`,
-    offsetX + CELL + 10,
+    offsetX + CELL + 10 * hud,
     offsetY + CELL / 2,
   )
   ctx.fillStyle = '#7fd4ff'
@@ -537,7 +551,7 @@ function draw(): void {
       : gems >= SHIELD_COST
         ? `\u25C6 ${gems}   tap space for shield`
         : `\u25C6 ${gems}`
-  ctx.fillText(gemText, offsetX + CELL + 310, offsetY + CELL / 2)
+  ctx.fillText(gemText, offsetX + CELL + 310 * hud, offsetY + CELL / 2)
 
   const centerOverlay = (dim: boolean) => {
     if (dim) {
