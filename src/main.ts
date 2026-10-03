@@ -5,6 +5,15 @@ const MAX_CELL = 50
 const MIN_GRID = 10
 let CELL = MAX_CELL
 
+const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+
+// On-screen d-pad geometry (touch devices in portrait reserve this space below the board)
+const DPAD_BTN = 56
+const DPAD_GAP = 8
+const DPAD_MARGIN = 20
+const CONTROLS_H = 3 * DPAD_BTN + 2 * DPAD_GAP + DPAD_MARGIN + 12
+const controlsReserved = () => isTouch && window.innerHeight > window.innerWidth
+
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!
 const ctx = canvas.getContext('2d')!
 
@@ -146,14 +155,16 @@ function placeLightBlue(): void {
 function resize(): void {
   canvas.width = window.innerWidth
   canvas.height = window.innerHeight
+  // In portrait on touch devices, keep the board clear of the bottom control area
+  const availH = canvas.height - (controlsReserved() ? CONTROLS_H : 0)
   CELL = Math.max(
     1,
-    Math.min(MAX_CELL, Math.floor(canvas.width / MIN_GRID), Math.floor(canvas.height / MIN_GRID)),
+    Math.min(MAX_CELL, Math.floor(canvas.width / MIN_GRID), Math.floor(availH / MIN_GRID)),
   )
   cols = Math.floor(canvas.width / CELL)
-  rows = Math.floor(canvas.height / CELL)
+  rows = Math.floor(availH / CELL)
   offsetX = Math.floor((canvas.width - cols * CELL) / 2)
-  offsetY = Math.floor((canvas.height - rows * CELL) / 2)
+  offsetY = Math.floor((availH - rows * CELL) / 2)
   player.x = Math.floor(cols / 2)
   player.y = Math.floor(rows / 2)
   placeBlocks()
@@ -715,8 +726,6 @@ window.addEventListener('keyup', (e) => {
 const SWIPE_MIN = 30
 let touchStart: { x: number; y: number } | null = null
 
-const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-
 // Go full screen on mobile when starting the game (best effort; iPhone Safari lacks support)
 function enterFullscreen(): void {
   if (!isTouch || document.fullscreenElement) return
@@ -734,14 +743,14 @@ interface DpadButton {
 }
 
 function dpadVisible(): boolean {
-  return isTouch && canvas.height > canvas.width && state === 'playing'
+  return controlsReserved() && state === 'playing'
 }
 
 function dpadButtons(): DpadButton[] {
-  const bs = 56
-  const gap = 8
+  const bs = DPAD_BTN
+  const gap = DPAD_GAP
   const cx = canvas.width / 2
-  const bottom = canvas.height - 20
+  const bottom = canvas.height - DPAD_MARGIN
   return [
     { dx: 0, dy: -1, x: cx - bs / 2, y: bottom - 3 * bs - 2 * gap, w: bs, h: bs },
     { dx: -1, dy: 0, x: cx - bs / 2 - gap - bs, y: bottom - 2 * bs - gap, w: bs, h: bs },
