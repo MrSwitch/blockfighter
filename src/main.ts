@@ -717,6 +717,12 @@ let touchStart: { x: number; y: number } | null = null
 
 const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
 
+// Go full screen on mobile when starting the game (best effort; iPhone Safari lacks support)
+function enterFullscreen(): void {
+  if (!isTouch || document.fullscreenElement) return
+  document.documentElement.requestFullscreen?.().catch(() => {})
+}
+
 // On-screen d-pad shown on touch devices in portrait orientation
 interface DpadButton {
   dx: number
@@ -766,6 +772,7 @@ canvas.addEventListener(
     if (Math.abs(dx) < SWIPE_MIN && Math.abs(dy) < SWIPE_MIN) {
       // Tap: advance non-playing screens
       if (state !== 'playing') {
+        enterFullscreen()
         advance()
         return
       }
