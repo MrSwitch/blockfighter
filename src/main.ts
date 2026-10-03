@@ -19,7 +19,7 @@ const player = { x: 0, y: 0 }
 const enemies: { x: number; y: number }[] = []
 const ENEMY_STEP_MS = 600
 
-let lives = 3
+let lives = 5
 let level = 1
 // intro: waiting to start the level | playing | cleared: level won | over: all lives spent
 let state: 'intro' | 'playing' | 'cleared' | 'over' = 'intro'
@@ -43,6 +43,18 @@ const CONFETTI_COLORS = ['#e02424', '#f5c518', '#9b3bd6', '#4a7aa5', '#2ecc71', 
 
 // Yellow blocks scattered around the map
 const yellows: { x: number; y: number }[] = []
+
+// Collectible light blue block (one per level) and total collected
+let lightBlue: { x: number; y: number } | null = null
+let gems = 0
+
+// Shield of blue blocks around the player (tap space with 3 gems)
+const SHIELD_COST = 3
+const SHIELD_MS = 5000
+let shieldUntil = 0
+const shieldActive = () => performance.now() < shieldUntil
+const inShieldRing = (x: number, y: number) =>
+  shieldActive() && Math.abs(x - player.x) <= 1 && Math.abs(y - player.y) <= 1
 
 // Active explosion effects
 const explosions: { x: number; y: number; start: number }[] = []
@@ -114,6 +126,20 @@ function placeYellows(): void {
   }
 }
 
+function placeLightBlue(): void {
+  lightBlue = null
+  let guard = 0
+  while (!lightBlue && guard++ < 10000) {
+    const x = 1 + Math.floor(Math.random() * (cols - 2))
+    const y = 1 + Math.floor(Math.random() * (rows - 2))
+    if (blocks.has(key(x, y))) continue
+    if (x === player.x && y === player.y) continue
+    if (enemies.some((e) => e.x === x && e.y === y)) continue
+    if (yellows.some((b) => b.x === x && b.y === y)) continue
+    lightBlue = { x, y }
+  }
+}
+
 function resize(): void {
   canvas.width = window.innerWidth
   canvas.height = window.innerHeight
@@ -126,6 +152,7 @@ function resize(): void {
   placeBlocks()
   placeEnemies()
   placeYellows()
+  placeLightBlue()
   draw()
 }
 
@@ -133,6 +160,7 @@ function resize(): void {
 function setupLevel(): void {
   placeBlocks()
   resetPositions()
+  placeLightBlue()
 }
 
 function resetPositions(): void {
@@ -152,6 +180,7 @@ function loseLife(): void {
 }
 
 function checkCollision(): void {
+  if (shieldActive()) return
   if (!enemies.some((e) => e.x === player.x && e.y === player.y)) return
   loseLife()
 }
@@ -232,6 +261,7 @@ function moveEnemies(): void {
     for (const s of steps) {
       if (s.x === e.x && s.y === e.y) continue
       if (blocks.has(key(s.x, s.y))) continue
+      if (inShieldRing(s.x, s.y)) continue
       if (enemies.some((o) => o !== e && o.x === s.x && o.y === s.y)) continue
       e.x = s.x
       e.y = s.y
@@ -256,6 +286,23 @@ setInterval(moveEnemies, ENEMY_STEP_MS)
 
 const isBorder = (x: number, y: number) => x === 0 || y === 0 || x === cols - 1 || y === rows - 1
 
+// Hold space to pull an adjacent blue block along behind you;
+// tap space (no movement) with 3+ gems to raise the shield
+let pulling = false
+let spaceDownAt = 0
+let movedWhileSpace = false
+
+function activateShield(): void {
+  if (state !== 'playing' || shieldActive() || gems < SHIELD_COST) return
+  // Gems are not consumed — the shield is reusable once you have 3
+  shieldUntil = performance.now() + SHIELD_MS
+  const tick = () => {
+    draw()
+    if (shieldActive()) requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+}
+
 function tryMove(dx: number, dy: number): void {
   if (state !== 'playing') return
   const nx = player.x + dx
@@ -263,19 +310,61 @@ function tryMove(dx: number, dy: number): void {
   if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) return
   if (blocks.has(key(nx, ny))) {
     // Push the blue block, unless it's the border wall or the cell behind it
-    // is blocked by a wall, another blue block, a purple chaser or a yellow bomb
+    // is blocked by a wall, another blue block, a purple chaser or a yellow bomb.
+    // With 5+ gems: super-push — the push always succeeds and whatever is
+    // behind gets crushed (blocks merge, chasers die, bombs detonate the block)
     if (isBorder(nx, ny)) return
     const bx = nx + dx
     const by = ny + dy
-    if (bx < 0 || by < 0 || bx >= cols || by >= rows) return
-    if (blocks.has(key(bx, by))) return
-    if (enemies.some((e) => e.x === bx && e.y === by)) return
-    if (yellows.some((b) => b.x === bx && b.y === by)) return
-    blocks.delete(key(nx, ny))
-    blocks.add(key(bx, by))
+    const superPush = gems >= 5
+    if (!superPush) {
+      if (bx < 0 || by < 0 || bx >= cols || by >= rows) return
+      if (blocks.has(key(bx, by))) return
+      if (enemies.some((e) => e.x === bx && e.y === by)) return
+      if (yellows.some((b) => b.x === bx && b.y === by)) return
+      if (lightBlue && lightBlue.x === bx && lightBlue.y === by) return
+      blocks.delete(key(nx, ny))
+      blocks.add(key(bx, by))
+    } else {
+      blocks.delete(key(nx, ny))
+      if (bx >= 0 && by >= 0 && bx < cols && by < rows && !isBorder(bx, by)) {
+        // Crush any chasers behind the block
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          if (enemies[i].x === bx && enemies[i].y === by) enemies.splice(i, 1)
+        }
+        // A bomb behind detonates and destroys the pushed block too
+        if (!detonateYellowAt(bx, by)) {
+          blocks.add(key(bx, by))
+        }
+      }
+      // Pushed against the wall or off-grid: the block is crushed and gone
+      if (enemies.length === 0) {
+        player.x = nx
+        player.y = ny
+        startLevelClear()
+        return
+      }
+    }
   }
+  const ox = player.x
+  const oy = player.y
   player.x = nx
   player.y = ny
+  if (pulling) movedWhileSpace = true
+  // While holding space, drag the blue block that was behind the move along
+  if (pulling) {
+    const px = ox - dx
+    const py = oy - dy
+    if (blocks.has(key(px, py)) && !isBorder(px, py)) {
+      blocks.delete(key(px, py))
+      blocks.add(key(ox, oy))
+    }
+  }
+  // Collect the light blue block
+  if (lightBlue && lightBlue.x === nx && lightBlue.y === ny) {
+    lightBlue = null
+    gems++
+  }
   // Stepping onto a yellow block blows up the player: lose a life
   if (detonateYellowAt(nx, ny)) {
     loseLife()
@@ -320,15 +409,81 @@ function draw(): void {
     ctx.fillRect(offsetX + b.x * CELL + 2, offsetY + b.y * CELL + 2, CELL - 4, CELL - 4)
   }
 
+  // Light blue collectible
+  if (lightBlue) {
+    ctx.fillStyle = '#7fd4ff'
+    ctx.fillRect(offsetX + lightBlue.x * CELL + 2, offsetY + lightBlue.y * CELL + 2, CELL - 4, CELL - 4)
+    // Sparkle
+    ctx.fillStyle = '#ffffff'
+    const sx = offsetX + lightBlue.x * CELL + CELL / 2
+    const sy = offsetY + lightBlue.y * CELL + CELL / 2
+    ctx.beginPath()
+    ctx.moveTo(sx, sy - 8)
+    ctx.lineTo(sx + 3, sy - 3)
+    ctx.lineTo(sx + 8, sy)
+    ctx.lineTo(sx + 3, sy + 3)
+    ctx.lineTo(sx, sy + 8)
+    ctx.lineTo(sx - 3, sy + 3)
+    ctx.lineTo(sx - 8, sy)
+    ctx.lineTo(sx - 3, sy - 3)
+    ctx.closePath()
+    ctx.fill()
+  }
+
   // Purple chasers
   ctx.fillStyle = '#9b3bd6'
   for (const e of enemies) {
     ctx.fillRect(offsetX + e.x * CELL + 2, offsetY + e.y * CELL + 2, CELL - 4, CELL - 4)
   }
+  // ...each with an angry face
+  for (const e of enemies) {
+    const cx = offsetX + e.x * CELL + CELL / 2
+    const cy = offsetY + e.y * CELL + CELL / 2
+    // Angry eyebrows
+    ctx.strokeStyle = '#111'
+    ctx.lineWidth = 3
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.moveTo(cx - 13, cy - 13)
+    ctx.lineTo(cx - 4, cy - 8)
+    ctx.moveTo(cx + 13, cy - 13)
+    ctx.lineTo(cx + 4, cy - 8)
+    ctx.stroke()
+    // Eyes
+    ctx.fillStyle = '#111'
+    ctx.beginPath()
+    ctx.arc(cx - 8, cy - 4, 3, 0, Math.PI * 2)
+    ctx.arc(cx + 8, cy - 4, 3, 0, Math.PI * 2)
+    ctx.fill()
+    // Frown
+    ctx.beginPath()
+    ctx.arc(cx, cy + 14, 9, 1.2 * Math.PI, 1.8 * Math.PI)
+    ctx.stroke()
+  }
 
   // Player (red block)
   ctx.fillStyle = '#e02424'
   ctx.fillRect(offsetX + player.x * CELL + 2, offsetY + player.y * CELL + 2, CELL - 4, CELL - 4)
+
+  // Shield ring of blue blocks around the player
+  if (shieldActive()) {
+    const remaining = (shieldUntil - performance.now()) / SHIELD_MS
+    ctx.globalAlpha = 0.5 + 0.5 * remaining
+    ctx.fillStyle = '#4a7aa5'
+    ctx.strokeStyle = '#7fd4ff'
+    ctx.lineWidth = 2
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue
+        const sx = player.x + dx
+        const sy = player.y + dy
+        if (sx < 0 || sy < 0 || sx >= cols || sy >= rows) continue
+        ctx.fillRect(offsetX + sx * CELL + 4, offsetY + sy * CELL + 4, CELL - 8, CELL - 8)
+        ctx.strokeRect(offsetX + sx * CELL + 4, offsetY + sy * CELL + 4, CELL - 8, CELL - 8)
+      }
+    }
+    ctx.globalAlpha = 1
+  }
 
   // Smiley face on the player
   {
@@ -375,6 +530,14 @@ function draw(): void {
     offsetX + CELL + 10,
     offsetY + CELL / 2,
   )
+  ctx.fillStyle = '#7fd4ff'
+  const gemText =
+    shieldActive()
+      ? `\u25C6 ${gems}   SHIELD ${Math.ceil((shieldUntil - performance.now()) / 1000)}s`
+      : gems >= SHIELD_COST
+        ? `\u25C6 ${gems}   tap space for shield`
+        : `\u25C6 ${gems}`
+  ctx.fillText(gemText, offsetX + CELL + 310, offsetY + CELL / 2)
 
   const centerOverlay = (dim: boolean) => {
     if (dim) {
@@ -432,33 +595,56 @@ function draw(): void {
   }
 }
 
+// Advance from intro/cleared/over screens (Enter key or screen tap)
+function advance(): void {
+  if (state === 'intro') {
+    // Start the current level
+    state = 'playing'
+    draw()
+    return
+  }
+  if (state === 'cleared') {
+    // Advance to the next level: new blue layout, +1 chaser, +1 bomb
+    level++
+    confetti.length = 0
+    setupLevel()
+    state = 'playing'
+    draw()
+    return
+  }
+  if (state === 'over') {
+    // Fresh game from level 1
+    lives = 5
+    level = 1
+    gems = 0
+    confetti.length = 0
+    setupLevel()
+    state = 'intro'
+    draw()
+  }
+}
+
 window.addEventListener('keydown', (e) => {
+  if (e.key === ' ') {
+    if (!e.repeat) {
+      pulling = true
+      spaceDownAt = performance.now()
+      movedWhileSpace = false
+    }
+    e.preventDefault()
+    return
+  }
+  if ((e.key === 'e' || e.key === 'E') && state === 'playing') {
+    // Reset the current level: new layout and fresh pieces, but no gem
+    placeBlocks()
+    resetPositions()
+    lightBlue = null
+    draw()
+    return
+  }
   if (e.key === 'Enter') {
-    if (state === 'intro') {
-      // Start the current level
-      state = 'playing'
-      draw()
-      return
-    }
-    if (state === 'cleared') {
-      // Advance to the next level: new blue layout, +1 chaser, +1 bomb
-      level++
-      confetti.length = 0
-      setupLevel()
-      state = 'playing'
-      draw()
-      return
-    }
-    if (state === 'over') {
-      // Fresh game from level 1
-      lives = 3
-      level = 1
-      confetti.length = 0
-      setupLevel()
-      state = 'intro'
-      draw()
-      return
-    }
+    advance()
+    if (state !== 'playing') return
   }
   switch (e.key) {
     case 'ArrowUp':
@@ -478,6 +664,53 @@ window.addEventListener('keydown', (e) => {
   }
   e.preventDefault()
 })
+
+window.addEventListener('keyup', (e) => {
+  if (e.key === ' ') {
+    pulling = false
+    // A quick tap without moving raises the shield
+    if (!movedWhileSpace && performance.now() - spaceDownAt < 300) {
+      activateShield()
+    }
+  }
+})
+
+// Touch: swipe to move, tap to start/advance screens
+const SWIPE_MIN = 30
+let touchStart: { x: number; y: number } | null = null
+
+canvas.addEventListener(
+  'touchstart',
+  (e) => {
+    const t = e.changedTouches[0]
+    touchStart = { x: t.clientX, y: t.clientY }
+    e.preventDefault()
+  },
+  { passive: false },
+)
+
+canvas.addEventListener(
+  'touchend',
+  (e) => {
+    if (!touchStart) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - touchStart.x
+    const dy = t.clientY - touchStart.y
+    touchStart = null
+    e.preventDefault()
+    if (Math.abs(dx) < SWIPE_MIN && Math.abs(dy) < SWIPE_MIN) {
+      // Tap: advance non-playing screens
+      if (state !== 'playing') advance()
+      return
+    }
+    if (Math.abs(dx) > Math.abs(dy)) {
+      tryMove(dx > 0 ? 1 : -1, 0)
+    } else {
+      tryMove(0, dy > 0 ? 1 : -1)
+    }
+  },
+  { passive: false },
+)
 
 window.addEventListener('resize', resize)
 resize()
