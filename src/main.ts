@@ -68,6 +68,12 @@ const shieldActive = () => performance.now() < shieldUntil
 const inShieldRing = (x: number, y: number) =>
   shieldActive() && Math.abs(x - player.x) <= 1 && Math.abs(y - player.y) <= 1
 
+// Freeze power: from level 7, press T to stop the purple blocks for 5 seconds
+const FREEZE_LEVEL = 7
+const FREEZE_MS = 5000
+let freezeUntil = 0
+const freezeActive = () => performance.now() < freezeUntil
+
 // Active explosion effects
 const explosions: { x: number; y: number; start: number }[] = []
 const EXPLOSION_MS = 450
@@ -262,6 +268,7 @@ function startLevelClear(): void {
 
 function moveEnemies(): void {
   if (state !== 'playing') return
+  if (freezeActive()) return
   for (const e of enemies) {
     const dx = Math.sign(player.x - e.x)
     const dy = Math.sign(player.y - e.y)
@@ -317,6 +324,16 @@ function activateShield(): void {
   const tick = () => {
     draw()
     if (shieldActive()) requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+}
+
+function activateFreeze(): void {
+  if (state !== 'playing' || level < FREEZE_LEVEL || freezeActive()) return
+  freezeUntil = performance.now() + FREEZE_MS
+  const tick = () => {
+    draw()
+    if (freezeActive()) requestAnimationFrame(tick)
   }
   requestAnimationFrame(tick)
 }
@@ -563,6 +580,17 @@ function draw(): void {
         ? `\u25C6 ${gems}   tap space for shield`
         : `\u25C6 ${gems}`
   ctx.fillText(gemText, offsetX + CELL + 310 * hud, offsetY + CELL / 2)
+  if (freezeActive()) {
+    ctx.fillStyle = '#9fe8ff'
+    ctx.fillText(
+      `FROZEN ${Math.ceil((freezeUntil - performance.now()) / 1000)}s`,
+      offsetX + CELL + 520 * hud,
+      offsetY + CELL / 2,
+    )
+  } else if (level >= FREEZE_LEVEL && state === 'playing') {
+    ctx.fillStyle = '#9fe8ff'
+    ctx.fillText(`T to freeze`, offsetX + CELL + 520 * hud, offsetY + CELL / 2)
+  }
 
   // On-screen d-pad (touch devices, portrait orientation)
   if (dpadVisible()) {
@@ -687,6 +715,10 @@ window.addEventListener('keydown', (e) => {
     resetPositions()
     lightBlue = null
     draw()
+    return
+  }
+  if (e.key === 't' || e.key === 'T') {
+    activateFreeze()
     return
   }
   if (e.key === 'Enter') {
