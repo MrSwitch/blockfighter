@@ -817,14 +817,23 @@ canvas.addEventListener(
         advance()
         return
       }
-      // Tap on a d-pad button moves in that direction
-      if (dpadVisible()) {
+      // Taps in the bottom control area only ever act as d-pad presses,
+      // never as board taps. Hit zones are generous: the nearest button
+      // within reach wins, and anything further away is ignored.
+      if (dpadVisible() && t.clientY >= canvas.height - CONTROLS_H) {
+        let best: DpadButton | null = null
+        let bestD = Infinity
         for (const b of dpadButtons()) {
-          if (t.clientX >= b.x && t.clientX <= b.x + b.w && t.clientY >= b.y && t.clientY <= b.y + b.h) {
-            tryMove(b.dx, b.dy)
-            return
+          const d = Math.hypot(t.clientX - (b.x + b.w / 2), t.clientY - (b.y + b.h / 2))
+          if (d < bestD) {
+            bestD = d
+            best = b
           }
         }
+        if (best && bestD <= DPAD_BTN * 1.5) {
+          tryMove(best.dx, best.dy)
+        }
+        return
       }
       // Otherwise move towards the tap: dominant axis relative to the player
       const px = offsetX + player.x * CELL + CELL / 2
