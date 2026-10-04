@@ -561,35 +561,31 @@ function draw(): void {
     ctx.globalAlpha = 1
   }
 
-  // Lives + level HUD (scaled with the cell size)
+  // Lives + level HUD (scaled with the cell size, laid out left to right
+  // using measured widths so the segments never overlap)
   const hud = CELL / MAX_CELL
-  ctx.fillStyle = '#fff'
   ctx.font = `bold ${Math.round(24 * hud)}px system-ui, sans-serif`
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
-  ctx.fillText(
-    `Level ${level}   Lives: ${'\u2764'.repeat(Math.max(lives, 0))}`,
-    offsetX + CELL + 10 * hud,
-    offsetY + CELL / 2,
-  )
-  ctx.fillStyle = '#7fd4ff'
+  let hudX = offsetX + CELL + 10 * hud
+  const hudY = offsetY + CELL / 2
+  const hudSegment = (text: string, color: string) => {
+    ctx.fillStyle = color
+    ctx.fillText(text, hudX, hudY)
+    hudX += ctx.measureText(text).width + 30 * hud
+  }
+  hudSegment(`Level ${level}   Lives: ${'\u2764'.repeat(Math.max(lives, 0))}`, '#fff')
   const gemText =
     shieldActive()
       ? `\u25C6 ${gems}   SHIELD ${Math.ceil((shieldUntil - performance.now()) / 1000)}s`
       : gems >= SHIELD_COST
         ? `\u25C6 ${gems}   tap space for shield`
         : `\u25C6 ${gems}`
-  ctx.fillText(gemText, offsetX + CELL + 310 * hud, offsetY + CELL / 2)
+  hudSegment(gemText, '#7fd4ff')
   if (freezeActive()) {
-    ctx.fillStyle = '#9fe8ff'
-    ctx.fillText(
-      `FROZEN ${Math.ceil((freezeUntil - performance.now()) / 1000)}s`,
-      offsetX + CELL + 520 * hud,
-      offsetY + CELL / 2,
-    )
+    hudSegment(`FROZEN ${Math.ceil((freezeUntil - performance.now()) / 1000)}s`, '#9fe8ff')
   } else if (level >= FREEZE_LEVEL && state === 'playing') {
-    ctx.fillStyle = '#9fe8ff'
-    ctx.fillText(`T to freeze`, offsetX + CELL + 520 * hud, offsetY + CELL / 2)
+    hudSegment(`T to freeze`, '#9fe8ff')
   }
 
   // On-screen d-pad (touch devices, portrait orientation)
