@@ -12,4 +12,6 @@ body {
   width: 100vw;
   height: 100vh;
   touch-action: none;
+  transition: transform 0.15s ease-out;
+  will-change: transform;
 }

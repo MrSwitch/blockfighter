@@ -855,3 +855,15 @@ canvas.addEventListener(
 
 window.addEventListener('resize', resize)
 resize()
+
+// Tilt the board towards the mouse (subtle 3D perspective effect)
+const TILT_MAX_DEG = 6
+window.addEventListener('mousemove', (e) => {
+  if (isTouch) return
+  const rx = (0.5 - e.clientY / window.innerHeight) * 2 * TILT_MAX_DEG
+  const ry = (e.clientX / window.innerWidth - 0.5) * 2 * TILT_MAX_DEG
+  canvas.style.transform = `perspective(1200px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg)`
+})
+document.addEventListener('mouseleave', () => {
+  canvas.style.transform = ''
+})
