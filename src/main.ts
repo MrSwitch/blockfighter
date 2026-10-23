@@ -856,14 +856,31 @@ canvas.addEventListener(
 window.addEventListener('resize', resize)
 resize()
 
-// Tilt the board towards the mouse (subtle 3D perspective effect)
+// Tilt the board with W/A/S/D while held (subtle 3D perspective effect)
 const TILT_MAX_DEG = 6
-window.addEventListener('mousemove', (e) => {
-  if (isTouch) return
-  const rx = (0.5 - e.clientY / window.innerHeight) * 2 * TILT_MAX_DEG
-  const ry = (e.clientX / window.innerWidth - 0.5) * 2 * TILT_MAX_DEG
-  canvas.style.transform = `perspective(1200px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg)`
+const tiltKeys = new Set<string>()
+
+function updateTilt(): void {
+  const rx = (tiltKeys.has('w') ? TILT_MAX_DEG : 0) - (tiltKeys.has('s') ? TILT_MAX_DEG : 0)
+  const ry = (tiltKeys.has('d') ? TILT_MAX_DEG : 0) - (tiltKeys.has('a') ? TILT_MAX_DEG : 0)
+  canvas.style.transform =
+    rx !== 0 || ry !== 0 ? `perspective(1200px) rotateX(${rx}deg) rotateY(${ry}deg)` : ''
+}
+
+window.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase()
+  if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
+    tiltKeys.add(k)
+    updateTilt()
+  }
 })
-document.addEventListener('mouseleave', () => {
-  canvas.style.transform = ''
+
+window.addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase()
+  if (tiltKeys.delete(k)) updateTilt()
+})
+
+window.addEventListener('blur', () => {
+  tiltKeys.clear()
+  updateTilt()
 })
