@@ -415,6 +415,30 @@ function tryMove(dx: number, dy: number): void {
   draw()
 }
 
+// 3D block look: a raised top face with a darker front edge below it
+const blockDepth = () => Math.max(3, Math.round(CELL * 0.16))
+
+function darken(hex: string, f: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  const r = Math.round(((n >> 16) & 255) * f)
+  const g = Math.round(((n >> 8) & 255) * f)
+  const b = Math.round((n & 255) * f)
+  return `rgb(${r}, ${g}, ${b})`
+}
+
+function block3D(gx: number, gy: number, color: string, inset = 2): void {
+  const d = blockDepth()
+  const px = offsetX + gx * CELL + inset
+  const py = offsetY + gy * CELL + inset
+  const s = CELL - inset * 2
+  // Front edge
+  ctx.fillStyle = darken(color, 0.5)
+  ctx.fillRect(px, py, s, s)
+  // Top face, raised
+  ctx.fillStyle = color
+  ctx.fillRect(px, py - d, s, s)
+}
+
 function draw(): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   hctx.clearRect(0, 0, hudCanvas.width, hudCanvas.height)
@@ -437,27 +461,29 @@ function draw(): void {
   }
   ctx.stroke()
 
-  // Obstacle blocks
-  ctx.fillStyle = '#4a7aa5'
-  for (const b of blocks) {
-    const [x, y] = b.split(',').map(Number)
-    ctx.fillRect(offsetX + x * CELL + 2, offsetY + y * CELL + 2, CELL - 4, CELL - 4)
+  // Obstacle blocks (drawn top row first so raised faces overlap correctly)
+  const blueCells = [...blocks]
+    .map((b) => b.split(',').map(Number))
+    .sort((a, b) => a[1] - b[1])
+  for (const [x, y] of blueCells) {
+    block3D(x, y, '#4a7aa5')
   }
 
   // Yellow blocks
-  ctx.fillStyle = '#f5c518'
   for (const b of yellows) {
-    ctx.fillRect(offsetX + b.x * CELL + 2, offsetY + b.y * CELL + 2, CELL - 4, CELL - 4)
+    block3D(b.x, b.y, '#f5c518')
   }
 
   // Light blue collectible
   if (lightBlue) {
-    ctx.fillStyle = '#7fd4ff'
-    ctx.fillRect(offsetX + lightBlue.x * CELL + 2, offsetY + lightBlue.y * CELL + 2, CELL - 4, CELL - 4)
+    block3D(lightBlue.x, lightBlue.y, '#7fd4ff')
     // Sparkle
     ctx.fillStyle = '#ffffff'
     ctx.save()
-    ctx.translate(offsetX + lightBlue.x * CELL + CELL / 2, offsetY + lightBlue.y * CELL + CELL / 2)
+    ctx.translate(
+      offsetX + lightBlue.x * CELL + CELL / 2,
+      offsetY + lightBlue.y * CELL + CELL / 2 - blockDepth(),
+    )
     ctx.scale(CELL / MAX_CELL, CELL / MAX_CELL)
     ctx.beginPath()
     ctx.moveTo(0, -8)
@@ -474,14 +500,16 @@ function draw(): void {
   }
 
   // Purple chasers
-  ctx.fillStyle = '#9b3bd6'
   for (const e of enemies) {
-    ctx.fillRect(offsetX + e.x * CELL + 2, offsetY + e.y * CELL + 2, CELL - 4, CELL - 4)
+    block3D(e.x, e.y, '#9b3bd6')
   }
   // ...each with an angry face
   for (const e of enemies) {
     ctx.save()
-    ctx.translate(offsetX + e.x * CELL + CELL / 2, offsetY + e.y * CELL + CELL / 2)
+    ctx.translate(
+      offsetX + e.x * CELL + CELL / 2,
+      offsetY + e.y * CELL + CELL / 2 - blockDepth(),
+    )
     ctx.scale(CELL / MAX_CELL, CELL / MAX_CELL)
     // Angry eyebrows
     ctx.strokeStyle = '#111'
@@ -507,8 +535,7 @@ function draw(): void {
   }
 
   // Player (red block)
-  ctx.fillStyle = '#e02424'
-  ctx.fillRect(offsetX + player.x * CELL + 2, offsetY + player.y * CELL + 2, CELL - 4, CELL - 4)
+  block3D(player.x, player.y, '#e02424')
 
   // Shield ring of blue blocks around the player
   if (shieldActive()) {
@@ -533,7 +560,10 @@ function draw(): void {
   // Smiley face on the player
   {
     ctx.save()
-    ctx.translate(offsetX + player.x * CELL + CELL / 2, offsetY + player.y * CELL + CELL / 2)
+    ctx.translate(
+      offsetX + player.x * CELL + CELL / 2,
+      offsetY + player.y * CELL + CELL / 2 - blockDepth(),
+    )
     ctx.scale(CELL / MAX_CELL, CELL / MAX_CELL)
     ctx.fillStyle = '#111'
     ctx.beginPath()
