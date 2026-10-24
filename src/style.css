@@ -12,4 +12,5 @@ body {
   width: 100vw;
   height: 100vh;
   touch-action: none;
+  transform: perspective(1200px) rotateX(45deg);
 }
