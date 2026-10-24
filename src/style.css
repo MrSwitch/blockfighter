@@ -7,21 +7,9 @@ body {
   background: #111;
 }
 
-#game,
-#ui {
+#game {
   display: block;
-  position: fixed;
-  inset: 0;
   width: 100vw;
   height: 100vh;
   touch-action: none;
-}
-
-/* Only the board tilts; the UI canvas stays flat on top */
-#game {
-  transform: perspective(1200px) rotateX(45deg);
-}
-
-#ui {
-  pointer-events: none;
 }

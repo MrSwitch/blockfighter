@@ -16,9 +16,6 @@ const controlsReserved = () => isTouch && window.innerHeight > window.innerWidth
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!
 const ctx = canvas.getContext('2d')!
-// Flat overlay canvas for text and controls (not tilted)
-const ui = document.querySelector<HTMLCanvasElement>('#ui')!
-const uictx = ui.getContext('2d')!
 
 // Grid dimensions in cells (recomputed on resize)
 let cols = 0
@@ -164,8 +161,6 @@ function placeLightBlue(): void {
 function resize(): void {
   canvas.width = window.innerWidth
   canvas.height = window.innerHeight
-  ui.width = window.innerWidth
-  ui.height = window.innerHeight
   // In portrait on touch devices, keep the board clear of the bottom control area
   const availH = canvas.height - (controlsReserved() ? CONTROLS_H : 0)
   CELL = Math.max(
@@ -566,19 +561,18 @@ function draw(): void {
     ctx.globalAlpha = 1
   }
 
-  // Lives + level HUD, drawn flat on the UI canvas (scaled with the cell size,
-  // laid out left to right using measured widths so the segments never overlap)
-  uictx.clearRect(0, 0, ui.width, ui.height)
+  // Lives + level HUD (scaled with the cell size, laid out left to right
+  // using measured widths so the segments never overlap)
   const hud = CELL / MAX_CELL
-  uictx.font = `bold ${Math.round(24 * hud)}px system-ui, sans-serif`
-  uictx.textAlign = 'left'
-  uictx.textBaseline = 'middle'
+  ctx.font = `bold ${Math.round(24 * hud)}px system-ui, sans-serif`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
   let hudX = offsetX + CELL + 10 * hud
   const hudY = offsetY + CELL / 2
   const hudSegment = (text: string, color: string) => {
-    uictx.fillStyle = color
-    uictx.fillText(text, hudX, hudY)
-    hudX += uictx.measureText(text).width + 30 * hud
+    ctx.fillStyle = color
+    ctx.fillText(text, hudX, hudY)
+    hudX += ctx.measureText(text).width + 30 * hud
   }
   hudSegment(`Level ${level}   Lives: ${'\u2764'.repeat(Math.max(lives, 0))}`, '#fff')
   const gemText =
@@ -597,78 +591,78 @@ function draw(): void {
   // On-screen d-pad (touch devices, portrait orientation)
   if (dpadVisible()) {
     for (const b of dpadButtons()) {
-      uictx.fillStyle = 'rgba(255, 255, 255, 0.15)'
-      uictx.strokeStyle = 'rgba(255, 255, 255, 0.4)'
-      uictx.lineWidth = 2
-      uictx.fillRect(b.x, b.y, b.w, b.h)
-      uictx.strokeRect(b.x, b.y, b.w, b.h)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'
+      ctx.lineWidth = 2
+      ctx.fillRect(b.x, b.y, b.w, b.h)
+      ctx.strokeRect(b.x, b.y, b.w, b.h)
       // Arrow pointing in the button's direction
       const cx = b.x + b.w / 2
       const cy = b.y + b.h / 2
       const a = b.w * 0.22
-      uictx.fillStyle = 'rgba(255, 255, 255, 0.8)'
-      uictx.beginPath()
-      uictx.moveTo(cx + b.dx * a, cy + b.dy * a)
-      uictx.lineTo(cx - b.dx * a + b.dy * a, cy - b.dy * a + b.dx * a)
-      uictx.lineTo(cx - b.dx * a - b.dy * a, cy - b.dy * a - b.dx * a)
-      uictx.closePath()
-      uictx.fill()
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
+      ctx.beginPath()
+      ctx.moveTo(cx + b.dx * a, cy + b.dy * a)
+      ctx.lineTo(cx - b.dx * a + b.dy * a, cy - b.dy * a + b.dx * a)
+      ctx.lineTo(cx - b.dx * a - b.dy * a, cy - b.dy * a - b.dx * a)
+      ctx.closePath()
+      ctx.fill()
     }
   }
 
   const centerOverlay = (dim: boolean) => {
     if (dim) {
-      uictx.fillStyle = 'rgba(0, 0, 0, 0.7)'
-      uictx.fillRect(0, 0, ui.width, ui.height)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
     }
-    uictx.textAlign = 'center'
-    uictx.textBaseline = 'middle'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
   }
 
   if (state === 'intro') {
     centerOverlay(true)
-    uictx.fillStyle = '#f5c518'
-    uictx.font = 'bold 64px system-ui, sans-serif'
-    uictx.fillText(`LEVEL ${level}`, ui.width / 2, ui.height / 2 - 30)
-    uictx.fillStyle = '#fff'
-    uictx.font = '28px system-ui, sans-serif'
-    uictx.fillText('Press Enter to start', ui.width / 2, ui.height / 2 + 30)
+    ctx.fillStyle = '#f5c518'
+    ctx.font = 'bold 64px system-ui, sans-serif'
+    ctx.fillText(`LEVEL ${level}`, canvas.width / 2, canvas.height / 2 - 30)
+    ctx.fillStyle = '#fff'
+    ctx.font = '28px system-ui, sans-serif'
+    ctx.fillText('Press Enter to start', canvas.width / 2, canvas.height / 2 + 30)
   }
 
   if (state === 'over') {
     centerOverlay(true)
-    uictx.fillStyle = '#e02424'
-    uictx.font = 'bold 64px system-ui, sans-serif'
-    uictx.fillText('GAME OVER', ui.width / 2, ui.height / 2 - 50)
-    uictx.fillStyle = '#f5c518'
-    uictx.font = 'bold 36px system-ui, sans-serif'
-    uictx.fillText(
+    ctx.fillStyle = '#e02424'
+    ctx.font = 'bold 64px system-ui, sans-serif'
+    ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 50)
+    ctx.fillStyle = '#f5c518'
+    ctx.font = 'bold 36px system-ui, sans-serif'
+    ctx.fillText(
       `You reached level ${level}`,
-      ui.width / 2,
-      ui.height / 2 + 10,
+      canvas.width / 2,
+      canvas.height / 2 + 10,
     )
-    uictx.fillStyle = '#fff'
-    uictx.font = '28px system-ui, sans-serif'
-    uictx.fillText('Press Enter to play again', ui.width / 2, ui.height / 2 + 70)
+    ctx.fillStyle = '#fff'
+    ctx.font = '28px system-ui, sans-serif'
+    ctx.fillText('Press Enter to play again', canvas.width / 2, canvas.height / 2 + 70)
   }
 
   if (state === 'cleared') {
     // Confetti
     for (const c of confetti) {
-      uictx.save()
-      uictx.translate(c.x, c.y)
-      uictx.rotate(c.rot)
-      uictx.fillStyle = c.color
-      uictx.fillRect(-c.size / 2, -c.size / 4, c.size, c.size / 2)
-      uictx.restore()
+      ctx.save()
+      ctx.translate(c.x, c.y)
+      ctx.rotate(c.rot)
+      ctx.fillStyle = c.color
+      ctx.fillRect(-c.size / 2, -c.size / 4, c.size, c.size / 2)
+      ctx.restore()
     }
     centerOverlay(false)
-    uictx.fillStyle = '#2ecc71'
-    uictx.font = 'bold 64px system-ui, sans-serif'
-    uictx.fillText(`LEVEL ${level} CLEARED!`, ui.width / 2, ui.height / 2 - 30)
-    uictx.fillStyle = '#fff'
-    uictx.font = '28px system-ui, sans-serif'
-    uictx.fillText(`Press Enter for level ${level + 1}`, ui.width / 2, ui.height / 2 + 30)
+    ctx.fillStyle = '#2ecc71'
+    ctx.font = 'bold 64px system-ui, sans-serif'
+    ctx.fillText(`LEVEL ${level} CLEARED!`, canvas.width / 2, canvas.height / 2 - 30)
+    ctx.fillStyle = '#fff'
+    ctx.font = '28px system-ui, sans-serif'
+    ctx.fillText(`Press Enter for level ${level + 1}`, canvas.width / 2, canvas.height / 2 + 30)
   }
 }
 
