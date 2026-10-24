@@ -438,11 +438,19 @@ function draw(): void {
     ctx.fillRect(offsetX + x * CELL + 2, offsetY + y * CELL + 2, CELL - 4, CELL - 4)
   }
 
-  // Yellow blocks
+  // Yellow blocks, labelled TNT
   ctx.fillStyle = '#f5c518'
   for (const b of yellows) {
     ctx.fillRect(offsetX + b.x * CELL + 2, offsetY + b.y * CELL + 2, CELL - 4, CELL - 4)
   }
+  ctx.fillStyle = '#111'
+  ctx.font = `bold ${Math.round(CELL * 0.32)}px system-ui, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  for (const b of yellows) {
+    ctx.fillText('TNT', offsetX + b.x * CELL + CELL / 2, offsetY + b.y * CELL + CELL / 2)
+  }
+  ctx.textAlign = 'left'
 
   // Light blue collectible
   if (lightBlue) {
