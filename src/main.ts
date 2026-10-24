@@ -226,7 +226,8 @@ function startGameOverExplosion(): void {
   }
   const tick = () => {
     draw()
-    if (state === 'over' && performance.now() - boomStart < GAME_OVER_BOOM_MS) {
+    // Keep exploding for as long as the game-over screen is showing
+    if (state === 'over') {
       requestAnimationFrame(tick)
     }
   }
@@ -669,9 +670,10 @@ function draw(): void {
 
   if (state === 'over') {
     centerOverlay(true)
-    // Big explosion radiating from where the player fell
-    const bt = Math.min((performance.now() - boomStart) / GAME_OVER_BOOM_MS, 1)
-    if (bt < 1) {
+    // Big explosion radiating from where the player fell, looping until
+    // the screen moves on to the level 1 intro
+    const bt = ((performance.now() - boomStart) % GAME_OVER_BOOM_MS) / GAME_OVER_BOOM_MS
+    {
       const maxR = Math.hypot(canvas.width, canvas.height) * 0.6
       ctx.globalAlpha = 1 - bt
       ctx.fillStyle = '#ff9f1c'
