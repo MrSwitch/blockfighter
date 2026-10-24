@@ -198,9 +198,39 @@ function loseLife(): void {
   lives--
   if (lives <= 0) {
     state = 'over'
+    startGameOverExplosion()
   } else {
     resetPositions()
   }
+}
+
+// Big explosion when the game-over screen appears
+const GAME_OVER_BOOM_MS = 1500
+let boomStart = 0
+let boomX = 0
+let boomY = 0
+const boomDebris: { angle: number; speed: number; size: number; color: string }[] = []
+
+function startGameOverExplosion(): void {
+  boomStart = performance.now()
+  boomX = offsetX + player.x * CELL + CELL / 2
+  boomY = offsetY + player.y * CELL + CELL / 2
+  boomDebris.length = 0
+  for (let i = 0; i < 80; i++) {
+    boomDebris.push({
+      angle: Math.random() * Math.PI * 2,
+      speed: 200 + Math.random() * 600,
+      size: 4 + Math.random() * 10,
+      color: ['#ff9f1c', '#fff3b0', '#e02424', '#f5c518'][Math.floor(Math.random() * 4)],
+    })
+  }
+  const tick = () => {
+    draw()
+    if (state === 'over' && performance.now() - boomStart < GAME_OVER_BOOM_MS) {
+      requestAnimationFrame(tick)
+    }
+  }
+  requestAnimationFrame(tick)
 }
 
 function checkCollision(): void {
@@ -639,6 +669,33 @@ function draw(): void {
 
   if (state === 'over') {
     centerOverlay(true)
+    // Big explosion radiating from where the player fell
+    const bt = Math.min((performance.now() - boomStart) / GAME_OVER_BOOM_MS, 1)
+    if (bt < 1) {
+      const maxR = Math.hypot(canvas.width, canvas.height) * 0.6
+      ctx.globalAlpha = 1 - bt
+      ctx.fillStyle = '#ff9f1c'
+      ctx.beginPath()
+      ctx.arc(boomX, boomY, maxR * bt, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#fff3b0'
+      ctx.beginPath()
+      ctx.arc(boomX, boomY, maxR * bt * 0.55, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath()
+      ctx.arc(boomX, boomY, maxR * bt * 0.2, 0, Math.PI * 2)
+      ctx.fill()
+      // Flying debris
+      const et = bt * (GAME_OVER_BOOM_MS / 1000)
+      for (const p of boomDebris) {
+        const px = boomX + Math.cos(p.angle) * p.speed * et
+        const py = boomY + Math.sin(p.angle) * p.speed * et + 150 * et * et
+        ctx.fillStyle = p.color
+        ctx.fillRect(px - p.size / 2, py - p.size / 2, p.size, p.size)
+      }
+      ctx.globalAlpha = 1
+    }
     ctx.fillStyle = '#e02424'
     ctx.font = 'bold 64px system-ui, sans-serif'
     ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 50)
