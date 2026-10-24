@@ -213,8 +213,9 @@ const boomDebris: { angle: number; speed: number; size: number; color: string }[
 
 function startGameOverExplosion(): void {
   boomStart = performance.now()
-  boomX = offsetX + player.x * CELL + CELL / 2
-  boomY = offsetY + player.y * CELL + CELL / 2
+  // Explode from the center of the board
+  boomX = offsetX + (cols * CELL) / 2
+  boomY = offsetY + (rows * CELL) / 2
   boomDebris.length = 0
   for (let i = 0; i < 80; i++) {
     boomDebris.push({
@@ -226,9 +227,12 @@ function startGameOverExplosion(): void {
   }
   const tick = () => {
     draw()
-    // Keep exploding for as long as the game-over screen is showing
-    if (state === 'over') {
+    if (state !== 'over') return
+    if (performance.now() - boomStart < GAME_OVER_BOOM_MS) {
       requestAnimationFrame(tick)
+    } else {
+      // Explosion finished: return to the level 1 intro screen
+      advance()
     }
   }
   requestAnimationFrame(tick)
@@ -670,10 +674,9 @@ function draw(): void {
 
   if (state === 'over') {
     centerOverlay(true)
-    // Big explosion radiating from where the player fell, looping until
-    // the screen moves on to the level 1 intro
-    const bt = ((performance.now() - boomStart) % GAME_OVER_BOOM_MS) / GAME_OVER_BOOM_MS
-    {
+    // Big explosion radiating from where the player fell
+    const bt = Math.min((performance.now() - boomStart) / GAME_OVER_BOOM_MS, 1)
+    if (bt < 1) {
       const maxR = Math.hypot(canvas.width, canvas.height) * 0.6
       ctx.globalAlpha = 1 - bt
       ctx.fillStyle = '#ff9f1c'
