@@ -16,9 +16,9 @@ const controlsReserved = () => isTouch && window.innerHeight > window.innerWidth
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!
 const ctx = canvas.getContext('2d')!
-// Untilted overlay canvas: all words/controls are drawn here so they stay flat
-const hudCanvas = document.querySelector<HTMLCanvasElement>('#hud')!
-const hctx = hudCanvas.getContext('2d')!
+// Flat overlay canvas for text and controls (not tilted)
+const ui = document.querySelector<HTMLCanvasElement>('#ui')!
+const uictx = ui.getContext('2d')!
 
 // Grid dimensions in cells (recomputed on resize)
 let cols = 0
@@ -164,8 +164,8 @@ function placeLightBlue(): void {
 function resize(): void {
   canvas.width = window.innerWidth
   canvas.height = window.innerHeight
-  hudCanvas.width = window.innerWidth
-  hudCanvas.height = window.innerHeight
+  ui.width = window.innerWidth
+  ui.height = window.innerHeight
   // In portrait on touch devices, keep the board clear of the bottom control area
   const availH = canvas.height - (controlsReserved() ? CONTROLS_H : 0)
   CELL = Math.max(
@@ -415,39 +415,8 @@ function tryMove(dx: number, dy: number): void {
   draw()
 }
 
-// Cube look: a rounded top face raised above a darker rounded body (curved edges)
-const blockDepth = () => Math.max(6, Math.round(CELL * 0.4))
-
-function darken(hex: string, f: number): string {
-  const n = parseInt(hex.slice(1), 16)
-  const r = Math.round(((n >> 16) & 255) * f)
-  const g = Math.round(((n >> 8) & 255) * f)
-  const b = Math.round((n & 255) * f)
-  return `rgb(${r}, ${g}, ${b})`
-}
-
-function blockCube(gx: number, gy: number, color: string, inset = 2): void {
-  const d = blockDepth()
-  const px = offsetX + gx * CELL + inset
-  const py = offsetY + gy * CELL + inset
-  const s = CELL - inset * 2
-  const r = Math.max(2, s * 0.2)
-  // Body fills the cell: the darker front edge shows below the top face,
-  // and nothing spills into the neighbouring cells
-  ctx.fillStyle = darken(color, 0.5)
-  ctx.beginPath()
-  ctx.roundRect(px, py, s, s, r)
-  ctx.fill()
-  // Top face occupies the upper part of the cell
-  ctx.fillStyle = color
-  ctx.beginPath()
-  ctx.roundRect(px, py, s, s - d, r)
-  ctx.fill()
-}
-
 function draw(): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height)
-  hctx.clearRect(0, 0, hudCanvas.width, hudCanvas.height)
 
   // Background
   ctx.fillStyle = '#111'
@@ -467,29 +436,27 @@ function draw(): void {
   }
   ctx.stroke()
 
-  // Obstacle blocks (drawn top row first so raised faces overlap correctly)
-  const blueCells = [...blocks]
-    .map((b) => b.split(',').map(Number))
-    .sort((a, b) => a[1] - b[1])
-  for (const [x, y] of blueCells) {
-    blockCube(x, y, '#4a7aa5')
+  // Obstacle blocks
+  ctx.fillStyle = '#4a7aa5'
+  for (const b of blocks) {
+    const [x, y] = b.split(',').map(Number)
+    ctx.fillRect(offsetX + x * CELL + 2, offsetY + y * CELL + 2, CELL - 4, CELL - 4)
   }
 
   // Yellow blocks
+  ctx.fillStyle = '#f5c518'
   for (const b of yellows) {
-    blockCube(b.x, b.y, '#f5c518')
+    ctx.fillRect(offsetX + b.x * CELL + 2, offsetY + b.y * CELL + 2, CELL - 4, CELL - 4)
   }
 
   // Light blue collectible
   if (lightBlue) {
-    blockCube(lightBlue.x, lightBlue.y, '#7fd4ff')
+    ctx.fillStyle = '#7fd4ff'
+    ctx.fillRect(offsetX + lightBlue.x * CELL + 2, offsetY + lightBlue.y * CELL + 2, CELL - 4, CELL - 4)
     // Sparkle
     ctx.fillStyle = '#ffffff'
     ctx.save()
-    ctx.translate(
-      offsetX + lightBlue.x * CELL + CELL / 2,
-      offsetY + lightBlue.y * CELL + CELL / 2 - blockDepth() / 2,
-    )
+    ctx.translate(offsetX + lightBlue.x * CELL + CELL / 2, offsetY + lightBlue.y * CELL + CELL / 2)
     ctx.scale(CELL / MAX_CELL, CELL / MAX_CELL)
     ctx.beginPath()
     ctx.moveTo(0, -8)
@@ -506,17 +473,16 @@ function draw(): void {
   }
 
   // Purple chasers
+  ctx.fillStyle = '#9b3bd6'
   for (const e of enemies) {
-    blockCube(e.x, e.y, '#9b3bd6')
+    ctx.fillRect(offsetX + e.x * CELL + 2, offsetY + e.y * CELL + 2, CELL - 4, CELL - 4)
   }
   // ...each with an angry face
   for (const e of enemies) {
     ctx.save()
-    ctx.translate(
-      offsetX + e.x * CELL + CELL / 2,
-      offsetY + e.y * CELL + CELL / 2 - blockDepth() / 2,
-    )
-    ctx.scale(CELL / MAX_CELL, (CELL / MAX_CELL) * 0.6)
+    ctx.translate(offsetX + e.x * CELL + CELL / 2, offsetY + e.y * CELL + CELL / 2)
+    ctx.scale(CELL / MAX_CELL, CELL / MAX_CELL)
+    // Angry eyebrows
     ctx.strokeStyle = '#111'
     ctx.lineWidth = 3
     ctx.lineCap = 'round'
@@ -540,7 +506,8 @@ function draw(): void {
   }
 
   // Player (red block)
-  blockCube(player.x, player.y, '#e02424')
+  ctx.fillStyle = '#e02424'
+  ctx.fillRect(offsetX + player.x * CELL + 2, offsetY + player.y * CELL + 2, CELL - 4, CELL - 4)
 
   // Shield ring of blue blocks around the player
   if (shieldActive()) {
@@ -565,11 +532,8 @@ function draw(): void {
   // Smiley face on the player
   {
     ctx.save()
-    ctx.translate(
-      offsetX + player.x * CELL + CELL / 2,
-      offsetY + player.y * CELL + CELL / 2 - blockDepth() / 2,
-    )
-    ctx.scale(CELL / MAX_CELL, (CELL / MAX_CELL) * 0.6)
+    ctx.translate(offsetX + player.x * CELL + CELL / 2, offsetY + player.y * CELL + CELL / 2)
+    ctx.scale(CELL / MAX_CELL, CELL / MAX_CELL)
     ctx.fillStyle = '#111'
     ctx.beginPath()
     ctx.arc(-8, -7, 3.5, 0, Math.PI * 2) // left eye
@@ -602,18 +566,19 @@ function draw(): void {
     ctx.globalAlpha = 1
   }
 
-  // Lives + level HUD (scaled with the cell size, laid out left to right
-  // using measured widths so the segments never overlap)
+  // Lives + level HUD, drawn flat on the UI canvas (scaled with the cell size,
+  // laid out left to right using measured widths so the segments never overlap)
+  uictx.clearRect(0, 0, ui.width, ui.height)
   const hud = CELL / MAX_CELL
-  hctx.font = `bold ${Math.round(24 * hud)}px system-ui, sans-serif`
-  hctx.textAlign = 'left'
-  hctx.textBaseline = 'middle'
+  uictx.font = `bold ${Math.round(24 * hud)}px system-ui, sans-serif`
+  uictx.textAlign = 'left'
+  uictx.textBaseline = 'middle'
   let hudX = offsetX + CELL + 10 * hud
   const hudY = offsetY + CELL / 2
   const hudSegment = (text: string, color: string) => {
-    hctx.fillStyle = color
-    hctx.fillText(text, hudX, hudY)
-    hudX += hctx.measureText(text).width + 30 * hud
+    uictx.fillStyle = color
+    uictx.fillText(text, hudX, hudY)
+    hudX += uictx.measureText(text).width + 30 * hud
   }
   hudSegment(`Level ${level}   Lives: ${'\u2764'.repeat(Math.max(lives, 0))}`, '#fff')
   const gemText =
@@ -632,78 +597,78 @@ function draw(): void {
   // On-screen d-pad (touch devices, portrait orientation)
   if (dpadVisible()) {
     for (const b of dpadButtons()) {
-      hctx.fillStyle = 'rgba(255, 255, 255, 0.15)'
-      hctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'
-      hctx.lineWidth = 2
-      hctx.fillRect(b.x, b.y, b.w, b.h)
-      hctx.strokeRect(b.x, b.y, b.w, b.h)
+      uictx.fillStyle = 'rgba(255, 255, 255, 0.15)'
+      uictx.strokeStyle = 'rgba(255, 255, 255, 0.4)'
+      uictx.lineWidth = 2
+      uictx.fillRect(b.x, b.y, b.w, b.h)
+      uictx.strokeRect(b.x, b.y, b.w, b.h)
       // Arrow pointing in the button's direction
       const cx = b.x + b.w / 2
       const cy = b.y + b.h / 2
       const a = b.w * 0.22
-      hctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
-      hctx.beginPath()
-      hctx.moveTo(cx + b.dx * a, cy + b.dy * a)
-      hctx.lineTo(cx - b.dx * a + b.dy * a, cy - b.dy * a + b.dx * a)
-      hctx.lineTo(cx - b.dx * a - b.dy * a, cy - b.dy * a - b.dx * a)
-      hctx.closePath()
-      hctx.fill()
+      uictx.fillStyle = 'rgba(255, 255, 255, 0.8)'
+      uictx.beginPath()
+      uictx.moveTo(cx + b.dx * a, cy + b.dy * a)
+      uictx.lineTo(cx - b.dx * a + b.dy * a, cy - b.dy * a + b.dx * a)
+      uictx.lineTo(cx - b.dx * a - b.dy * a, cy - b.dy * a - b.dx * a)
+      uictx.closePath()
+      uictx.fill()
     }
   }
 
   const centerOverlay = (dim: boolean) => {
     if (dim) {
-      hctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
-      hctx.fillRect(0, 0, hudCanvas.width, hudCanvas.height)
+      uictx.fillStyle = 'rgba(0, 0, 0, 0.7)'
+      uictx.fillRect(0, 0, ui.width, ui.height)
     }
-    hctx.textAlign = 'center'
-    hctx.textBaseline = 'middle'
+    uictx.textAlign = 'center'
+    uictx.textBaseline = 'middle'
   }
 
   if (state === 'intro') {
     centerOverlay(true)
-    hctx.fillStyle = '#f5c518'
-    hctx.font = 'bold 64px system-ui, sans-serif'
-    hctx.fillText(`LEVEL ${level}`, hudCanvas.width / 2, hudCanvas.height / 2 - 30)
-    hctx.fillStyle = '#fff'
-    hctx.font = '28px system-ui, sans-serif'
-    hctx.fillText('Press Enter to start', hudCanvas.width / 2, hudCanvas.height / 2 + 30)
+    uictx.fillStyle = '#f5c518'
+    uictx.font = 'bold 64px system-ui, sans-serif'
+    uictx.fillText(`LEVEL ${level}`, ui.width / 2, ui.height / 2 - 30)
+    uictx.fillStyle = '#fff'
+    uictx.font = '28px system-ui, sans-serif'
+    uictx.fillText('Press Enter to start', ui.width / 2, ui.height / 2 + 30)
   }
 
   if (state === 'over') {
     centerOverlay(true)
-    hctx.fillStyle = '#e02424'
-    hctx.font = 'bold 64px system-ui, sans-serif'
-    hctx.fillText('GAME OVER', hudCanvas.width / 2, hudCanvas.height / 2 - 50)
-    hctx.fillStyle = '#f5c518'
-    hctx.font = 'bold 36px system-ui, sans-serif'
-    hctx.fillText(
+    uictx.fillStyle = '#e02424'
+    uictx.font = 'bold 64px system-ui, sans-serif'
+    uictx.fillText('GAME OVER', ui.width / 2, ui.height / 2 - 50)
+    uictx.fillStyle = '#f5c518'
+    uictx.font = 'bold 36px system-ui, sans-serif'
+    uictx.fillText(
       `You reached level ${level}`,
-      hudCanvas.width / 2,
-      hudCanvas.height / 2 + 10,
+      ui.width / 2,
+      ui.height / 2 + 10,
     )
-    hctx.fillStyle = '#fff'
-    hctx.font = '28px system-ui, sans-serif'
-    hctx.fillText('Press Enter to play again', hudCanvas.width / 2, hudCanvas.height / 2 + 70)
+    uictx.fillStyle = '#fff'
+    uictx.font = '28px system-ui, sans-serif'
+    uictx.fillText('Press Enter to play again', ui.width / 2, ui.height / 2 + 70)
   }
 
   if (state === 'cleared') {
     // Confetti
     for (const c of confetti) {
-      hctx.save()
-      hctx.translate(c.x, c.y)
-      hctx.rotate(c.rot)
-      hctx.fillStyle = c.color
-      hctx.fillRect(-c.size / 2, -c.size / 4, c.size, c.size / 2)
-      hctx.restore()
+      uictx.save()
+      uictx.translate(c.x, c.y)
+      uictx.rotate(c.rot)
+      uictx.fillStyle = c.color
+      uictx.fillRect(-c.size / 2, -c.size / 4, c.size, c.size / 2)
+      uictx.restore()
     }
     centerOverlay(false)
-    hctx.fillStyle = '#2ecc71'
-    hctx.font = 'bold 64px system-ui, sans-serif'
-    hctx.fillText(`LEVEL ${level} CLEARED!`, hudCanvas.width / 2, hudCanvas.height / 2 - 30)
-    hctx.fillStyle = '#fff'
-    hctx.font = '28px system-ui, sans-serif'
-    hctx.fillText(`Press Enter for level ${level + 1}`, hudCanvas.width / 2, hudCanvas.height / 2 + 30)
+    uictx.fillStyle = '#2ecc71'
+    uictx.font = 'bold 64px system-ui, sans-serif'
+    uictx.fillText(`LEVEL ${level} CLEARED!`, ui.width / 2, ui.height / 2 - 30)
+    uictx.fillStyle = '#fff'
+    uictx.font = '28px system-ui, sans-serif'
+    uictx.fillText(`Press Enter for level ${level + 1}`, ui.width / 2, ui.height / 2 + 30)
   }
 }
 
