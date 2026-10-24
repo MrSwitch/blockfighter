@@ -432,15 +432,16 @@ function blockCube(gx: number, gy: number, color: string, inset = 2): void {
   const py = offsetY + gy * CELL + inset
   const s = CELL - inset * 2
   const r = Math.max(2, s * 0.2)
-  // Extruded body: the darker front edge shows below the top face
+  // Body fills the cell: the darker front edge shows below the top face,
+  // and nothing spills into the neighbouring cells
   ctx.fillStyle = darken(color, 0.5)
   ctx.beginPath()
-  ctx.roundRect(px, py - d, s, s + d, r)
+  ctx.roundRect(px, py, s, s, r)
   ctx.fill()
-  // Raised top face
+  // Top face occupies the upper part of the cell
   ctx.fillStyle = color
   ctx.beginPath()
-  ctx.roundRect(px, py - d, s, s, r)
+  ctx.roundRect(px, py, s, s - d, r)
   ctx.fill()
 }
 
@@ -487,7 +488,7 @@ function draw(): void {
     ctx.save()
     ctx.translate(
       offsetX + lightBlue.x * CELL + CELL / 2,
-      offsetY + lightBlue.y * CELL + CELL / 2 - blockDepth(),
+      offsetY + lightBlue.y * CELL + CELL / 2 - blockDepth() / 2,
     )
     ctx.scale(CELL / MAX_CELL, CELL / MAX_CELL)
     ctx.beginPath()
@@ -513,10 +514,9 @@ function draw(): void {
     ctx.save()
     ctx.translate(
       offsetX + e.x * CELL + CELL / 2,
-      offsetY + e.y * CELL + CELL / 2 - blockDepth(),
+      offsetY + e.y * CELL + CELL / 2 - blockDepth() / 2,
     )
-    ctx.scale(CELL / MAX_CELL, CELL / MAX_CELL)
-    // Angry eyebrows
+    ctx.scale(CELL / MAX_CELL, (CELL / MAX_CELL) * 0.6)
     ctx.strokeStyle = '#111'
     ctx.lineWidth = 3
     ctx.lineCap = 'round'
@@ -567,9 +567,9 @@ function draw(): void {
     ctx.save()
     ctx.translate(
       offsetX + player.x * CELL + CELL / 2,
-      offsetY + player.y * CELL + CELL / 2 - blockDepth(),
+      offsetY + player.y * CELL + CELL / 2 - blockDepth() / 2,
     )
-    ctx.scale(CELL / MAX_CELL, CELL / MAX_CELL)
+    ctx.scale(CELL / MAX_CELL, (CELL / MAX_CELL) * 0.6)
     ctx.fillStyle = '#111'
     ctx.beginPath()
     ctx.arc(-8, -7, 3.5, 0, Math.PI * 2) // left eye
