@@ -415,7 +415,7 @@ function tryMove(dx: number, dy: number): void {
   draw()
 }
 
-// 3D block look: a raised top face with a darker front edge below it
+// Cube look: a rounded top face raised above a darker rounded body (curved edges)
 const blockDepth = () => Math.max(3, Math.round(CELL * 0.16))
 
 function darken(hex: string, f: number): string {
@@ -426,17 +426,22 @@ function darken(hex: string, f: number): string {
   return `rgb(${r}, ${g}, ${b})`
 }
 
-function block3D(gx: number, gy: number, color: string, inset = 2): void {
+function blockCube(gx: number, gy: number, color: string, inset = 2): void {
   const d = blockDepth()
   const px = offsetX + gx * CELL + inset
   const py = offsetY + gy * CELL + inset
   const s = CELL - inset * 2
-  // Front edge
+  const r = Math.max(2, s * 0.2)
+  // Extruded body: the darker front edge shows below the top face
   ctx.fillStyle = darken(color, 0.5)
-  ctx.fillRect(px, py, s, s)
-  // Top face, raised
+  ctx.beginPath()
+  ctx.roundRect(px, py - d, s, s + d, r)
+  ctx.fill()
+  // Raised top face
   ctx.fillStyle = color
-  ctx.fillRect(px, py - d, s, s)
+  ctx.beginPath()
+  ctx.roundRect(px, py - d, s, s, r)
+  ctx.fill()
 }
 
 function draw(): void {
@@ -466,17 +471,17 @@ function draw(): void {
     .map((b) => b.split(',').map(Number))
     .sort((a, b) => a[1] - b[1])
   for (const [x, y] of blueCells) {
-    block3D(x, y, '#4a7aa5')
+    blockCube(x, y, '#4a7aa5')
   }
 
   // Yellow blocks
   for (const b of yellows) {
-    block3D(b.x, b.y, '#f5c518')
+    blockCube(b.x, b.y, '#f5c518')
   }
 
   // Light blue collectible
   if (lightBlue) {
-    block3D(lightBlue.x, lightBlue.y, '#7fd4ff')
+    blockCube(lightBlue.x, lightBlue.y, '#7fd4ff')
     // Sparkle
     ctx.fillStyle = '#ffffff'
     ctx.save()
@@ -501,7 +506,7 @@ function draw(): void {
 
   // Purple chasers
   for (const e of enemies) {
-    block3D(e.x, e.y, '#9b3bd6')
+    blockCube(e.x, e.y, '#9b3bd6')
   }
   // ...each with an angry face
   for (const e of enemies) {
@@ -535,7 +540,7 @@ function draw(): void {
   }
 
   // Player (red block)
-  block3D(player.x, player.y, '#e02424')
+  blockCube(player.x, player.y, '#e02424')
 
   // Shield ring of blue blocks around the player
   if (shieldActive()) {
