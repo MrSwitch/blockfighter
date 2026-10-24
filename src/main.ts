@@ -416,7 +416,7 @@ function tryMove(dx: number, dy: number): void {
 }
 
 // Cube look: a rounded top face raised above a darker rounded body (curved edges)
-const blockDepth = () => Math.max(3, Math.round(CELL * 0.16))
+const blockDepth = () => Math.max(6, Math.round(CELL * 0.4))
 
 function darken(hex: string, f: number): string {
   const n = parseInt(hex.slice(1), 16)
