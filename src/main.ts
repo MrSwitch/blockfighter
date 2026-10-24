@@ -856,8 +856,8 @@ canvas.addEventListener(
 window.addEventListener('resize', resize)
 resize()
 
-// Tilt the board with W/A/S/D while held (subtle 3D perspective effect)
-const TILT_MAX_DEG = 15
+// Tilt the board with W/A/S/D while held (3D perspective effect)
+const TILT_MAX_DEG = 45
 const tiltKeys = new Set<string>()
 
 function updateTilt(): void {
