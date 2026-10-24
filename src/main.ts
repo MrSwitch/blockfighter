@@ -856,31 +856,35 @@ canvas.addEventListener(
 window.addEventListener('resize', resize)
 resize()
 
-// Tilt the board with W/A/S/D while held (3D perspective effect)
+// Tilt the board with W/A/S/D (3D perspective effect). The tilt stays until
+// the same key is pressed again (toggles off) or the opposite key switches it.
 const TILT_MAX_DEG = 45
-const tiltKeys = new Set<string>()
+let tiltX = 0 // rotateX: 1 = W (up), -1 = S (down)
+let tiltY = 0 // rotateY: 1 = D (right), -1 = A (left)
 
 function updateTilt(): void {
-  const rx = (tiltKeys.has('w') ? TILT_MAX_DEG : 0) - (tiltKeys.has('s') ? TILT_MAX_DEG : 0)
-  const ry = (tiltKeys.has('d') ? TILT_MAX_DEG : 0) - (tiltKeys.has('a') ? TILT_MAX_DEG : 0)
+  const rx = tiltX * TILT_MAX_DEG
+  const ry = tiltY * TILT_MAX_DEG
   canvas.style.transform =
     rx !== 0 || ry !== 0 ? `perspective(1200px) rotateX(${rx}deg) rotateY(${ry}deg)` : ''
 }
 
 window.addEventListener('keydown', (e) => {
-  const k = e.key.toLowerCase()
-  if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
-    tiltKeys.add(k)
-    updateTilt()
+  switch (e.key.toLowerCase()) {
+    case 'w':
+      tiltX = tiltX === 1 ? 0 : 1
+      break
+    case 's':
+      tiltX = tiltX === -1 ? 0 : -1
+      break
+    case 'd':
+      tiltY = tiltY === 1 ? 0 : 1
+      break
+    case 'a':
+      tiltY = tiltY === -1 ? 0 : -1
+      break
+    default:
+      return
   }
-})
-
-window.addEventListener('keyup', (e) => {
-  const k = e.key.toLowerCase()
-  if (tiltKeys.delete(k)) updateTilt()
-})
-
-window.addEventListener('blur', () => {
-  tiltKeys.clear()
   updateTilt()
 })
